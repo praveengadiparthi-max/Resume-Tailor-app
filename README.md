@@ -8,11 +8,14 @@ Resume Tailor automates the tedious task of rewriting your resume for each job a
 
 **Key Features:**
 - ✅ Upload resumes in **PDF**, **DOCX**, or paste as **plain text**
-- ✨ AI-powered tailoring using **Claude Sonnet 4.6** with prompt caching
-- 📄 Download tailored resume as **professional PDF**
+- ✨ AI-powered tailoring using **Claude Haiku** (fast) or **Claude Sonnet** (quality) — toggle in UI
+- 📄 Download tailored resume as **professional PDF** — filename = your first + last name
 - 🔒 API key stays local — never stored on servers
-- ⚡ Fast processing with prompt caching optimization
-- 🎨 Clean, intuitive web interface
+- ⚡ Fast processing with prompt caching; shows generation time per model in UI
+- 🎯 ATS-optimised: skills filtered to JD-relevant only, semantic tool mapping (e.g. Dynatrace → Datadog equivalent)
+- 🔗 Certification hyperlink URLs preserved from source PDF
+- 📐 Smart PDF layout: auto-compacts spacing if last page is less than 50% full
+- 🗂️ Auto-preloads your default resume on page load (place PDF in `backend/assets/`)
 
 ---
 
@@ -68,6 +71,31 @@ resume-tailor/
 │
 ├── package.json                # Root npm scripts (concurrently)
 └── README.md                   # This file
+```
+
+---
+
+## Start & Stop (Windows PowerShell)
+
+### Start (frontend + backend together)
+```powershell
+cd C:\Users\Prave\Desktop\Claude-Project\resume-tailor
+npm run dev
+```
+Opens frontend at http://localhost:5173 and backend at http://localhost:8000.
+
+### Stop
+```powershell
+Get-Process python -ErrorAction SilentlyContinue | Stop-Process -Force
+Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force
+```
+
+### If ports are stuck
+```powershell
+@(8000, 5173) | ForEach-Object {
+    $pid = (Get-NetTCPConnection -LocalPort $_ -ErrorAction SilentlyContinue).OwningProcess
+    if ($pid) { Stop-Process -Id $pid -Force }
+}
 ```
 
 ---

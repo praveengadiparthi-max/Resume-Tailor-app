@@ -1,11 +1,18 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
 
 const MAX_SIZE = 5 * 1024 * 1024
 
-export default function ResumeInput({ onChange, disabled }) {
+export default function ResumeInput({ onChange, disabled, preloadedFile }) {
   const [mode, setMode] = useState('upload')
   const [file, setFile] = useState(null)
+
+  useEffect(() => {
+    if (preloadedFile && !file) {
+      setFile(preloadedFile)
+      onChange({ mode: 'upload', file: preloadedFile })
+    }
+  }, [preloadedFile])
   const [text, setText] = useState('')
   const [dropError, setDropError] = useState('')
 

@@ -26,18 +26,37 @@ def _sanitize(text: str) -> str:
 def extract_from_pdf(file_bytes: bytes) -> str:
     try:
         pages = []
+        links: list[str] = []
         with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
             for page in pdf.pages:
                 text = page.extract_text()
                 if text:
                     pages.append(text)
+                for hl in (page.hyperlinks or []):
+                    uri = hl.get("uri", "").strip()
+                    if not uri:
+                        continue
+                    try:
+                        x0 = hl.get("x0", 0)
+                        top = hl.get("top", hl.get("y0", 0))
+                        x1 = hl.get("x1", page.width)
+                        bottom = hl.get("bottom", hl.get("y1", page.height))
+                        link_text = (page.crop((x0, top, x1, bottom)).extract_text() or "").strip()
+                    except Exception:
+                        link_text = ""
+                    entry = f"{link_text}: {uri}" if link_text else uri
+                    if entry not in links:
+                        links.append(entry)
         if not pages:
             raise HTTPException(
                 status_code=422,
                 detail="Could not extract text from this PDF. Try pasting the text instead.",
                 headers={"X-Error-Code": "PARSE_FAILED"},
             )
-        return _sanitize("\n\n".join(pages))
+        result = _sanitize("\n\n".join(pages))
+        if links:
+            result += "\n\n[HYPERLINKS IN DOCUMENT]\n" + "\n".join(links)
+        return result
     except HTTPException:
         raise
     except Exception as e:

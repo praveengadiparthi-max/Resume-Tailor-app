@@ -27,6 +27,9 @@ override.tf.json
 .env.*.local
 .envrc
 
+# Default resume (personal file — do not commit)
+backend/assets/
+
 # Python virtual environment
 backend/venv/
 backend/__pycache__/

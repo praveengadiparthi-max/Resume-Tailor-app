@@ -23,10 +23,11 @@ function friendlyError(err) {
   return 'Network error. Please check your connection and try again.'
 }
 
-export async function tailorFromUpload(file, jobDescription, onProgress) {
+export async function tailorFromUpload(file, jobDescription, qualityMode, onProgress) {
   const form = new FormData()
   form.append('file', file)
   form.append('job_description', jobDescription)
+  form.append('quality_mode', qualityMode ? 'true' : 'false')
   try {
     const response = await api.post('/tailor/upload', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
@@ -41,11 +42,11 @@ export async function tailorFromUpload(file, jobDescription, onProgress) {
   }
 }
 
-export async function tailorFromText(resumeText, jobDescription) {
+export async function tailorFromText(resumeText, jobDescription, qualityMode) {
   try {
     const response = await api.post(
       '/tailor/text',
-      { resume_text: resumeText, job_description: jobDescription },
+      { resume_text: resumeText, job_description: jobDescription, quality_mode: qualityMode },
       { timeout: 120000 },
     )
     return response.data
@@ -56,4 +57,11 @@ export async function tailorFromText(resumeText, jobDescription) {
 
 export function getDownloadUrl(token) {
   return `/api/download/${token}`
+}
+
+export async function fetchDefaultResume() {
+  const resp = await fetch('/api/default-resume')
+  if (!resp.ok) return null
+  const blob = await resp.blob()
+  return new File([blob], 'default_resume.pdf', { type: 'application/pdf' })
 }

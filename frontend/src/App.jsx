@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { tailorFromUpload, tailorFromText } from './api/resumeApi'
+import { tailorFromUpload, tailorFromText, fetchDefaultResume } from './api/resumeApi'
 import DownloadSection from './components/DownloadSection'
 import JobDescriptionInput from './components/JobDescriptionInput'
 import ResumeInput from './components/ResumeInput'
@@ -12,9 +12,13 @@ const INITIAL_STATE = {
   file: null,
   resumeText: '',
   jobDescription: '',
+  qualityMode: false,
   downloadToken: null,
+  candidateName: null,
   errorMessage: null,
   progress: 0,
+  elapsedSeconds: null,
+  modelUsed: null,
 }
 
 export default function App() {
@@ -49,19 +53,22 @@ export default function App() {
   }
 
   async function handleTailor() {
-    patch({ phase: 'processing', errorMessage: null, progress: 0 })
+    const startTime = Date.now()
+    const modelUsed = state.qualityMode ? 'Sonnet (Quality)' : 'Haiku (Fast)'
+    patch({ phase: 'processing', errorMessage: null, progress: 0, elapsedSeconds: null, modelUsed: null })
     startFakeProgress()
     try {
       let data
       if (state.inputMode === 'upload') {
-        data = await tailorFromUpload(state.file, state.jobDescription, (pct) =>
+        data = await tailorFromUpload(state.file, state.jobDescription, state.qualityMode, (pct) =>
           patch({ progress: pct }),
         )
       } else {
-        data = await tailorFromText(state.resumeText, state.jobDescription)
+        data = await tailorFromText(state.resumeText, state.jobDescription, state.qualityMode)
       }
       stopFakeProgress()
-      patch({ progress: 100, phase: 'ready', downloadToken: data.download_token })
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
+      patch({ progress: 100, phase: 'ready', downloadToken: data.download_token, candidateName: data.candidate_name, elapsedSeconds: elapsed, modelUsed })
     } catch (err) {
       stopFakeProgress()
       patch({ phase: 'error', errorMessage: err.message, progress: 0 })
@@ -72,6 +79,12 @@ export default function App() {
     stopFakeProgress()
     setState(INITIAL_STATE)
   }
+
+  useEffect(() => {
+    fetchDefaultResume().then((file) => {
+      if (file) patch({ file, inputMode: 'upload' })
+    })
+  }, [])
 
   useEffect(() => () => clearInterval(progressTimer.current), [])
 
@@ -101,7 +114,7 @@ export default function App() {
         </div>
 
         {state.phase === 'ready' ? (
-          <DownloadSection token={state.downloadToken} onReset={handleReset} />
+          <DownloadSection token={state.downloadToken} candidateName={state.candidateName} onReset={handleReset} elapsedSeconds={state.elapsedSeconds} modelUsed={state.modelUsed} />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Left column */}
@@ -109,6 +122,7 @@ export default function App() {
               <ResumeInput
                 onChange={handleResumeChange}
                 disabled={state.phase === 'processing'}
+                preloadedFile={state.file}
               />
             </div>
 
@@ -132,6 +146,30 @@ export default function App() {
                   <strong>Error:</strong> {state.errorMessage}
                 </div>
               )}
+
+              {/* Model toggle */}
+              <div className="flex items-center justify-center gap-3">
+                <span className={`text-sm font-medium ${!state.qualityMode ? 'text-brand' : 'text-gray-400'}`}>
+                  ⚡ Fast
+                </span>
+                <button
+                  onClick={() => patch({ qualityMode: !state.qualityMode })}
+                  disabled={state.phase === 'processing'}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50 ${
+                    state.qualityMode ? 'bg-brand' : 'bg-gray-300'
+                  }`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                    state.qualityMode ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
+                </button>
+                <span className={`text-sm font-medium ${state.qualityMode ? 'text-brand' : 'text-gray-400'}`}>
+                  ✨ Quality
+                </span>
+                <span className="text-xs text-gray-400 ml-1">
+                  {state.qualityMode ? '(Sonnet — best output)' : '(Haiku — fast & cheap)'}
+                </span>
+              </div>
 
               <TailorButton
                 onClick={handleTailor}

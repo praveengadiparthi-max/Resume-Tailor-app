@@ -1,76 +1,53 @@
 import json
 import os
+from pathlib import Path
 
 import anthropic
+from dotenv import load_dotenv
 from fastapi import HTTPException
+
+env_path = Path(__file__).parent.parent / ".env"
+load_dotenv(env_path)
 
 client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
-SYSTEM_PROMPT = """You are an expert resume writer and career coach with 15 years of experience tailoring resumes for ATS systems and human recruiters.
+SYSTEM_PROMPT = """You are an ATS resume expert. Tailor resumes to pass automated screening and impress recruiters.
 
 RULES:
-- Never fabricate experience, skills, dates, employer names, job titles, degrees, or GPA that are not in the original resume.
-- You MAY rephrase bullet points, reorder sections, strengthen action verbs, and add relevant keywords from the job description where they accurately reflect the candidate's actual experience.
-- Use strong action verbs: achieved, designed, led, delivered, built, optimized, reduced, increased, launched, managed.
-- Quantify accomplishments where the original text implies measurable results (e.g., "improved performance" → "improved performance by ~30%").
-- Rewrite the summary to be 3-4 sentences directly targeting the role described in the job description.
-- Reorder skills so that those matching the job description appear first.
-- Output ONLY valid JSON — no prose, no markdown code fences, no explanation."""
+- Never fabricate experience, skills, dates, employer names, job titles, degrees, or GPA.
+- Rephrase bullets and weave in job description keywords where they accurately reflect the candidate's experience.
+- Use strong action verbs: built, led, automated, deployed, optimized, reduced, increased, implemented.
+- Quantify where the original implies measurable results (e.g., "improved X" → "improved X by ~30%").
+- Summary: 3-4 sentences mirroring exact keywords from the job description.
+- Skills: only include skills and tools that are relevant to or mentioned in the job description. Drop entire skill groups or individual items that have no connection to the JD. Keep categories from the original but trim aggressively — a focused skills section scores better than an exhaustive one.
+- Preserve ALL certification URLs from [HYPERLINKS IN DOCUMENT] if present.
+- Output ONLY valid JSON, no prose, no markdown fences.
 
-USER_PROMPT_TEMPLATE = """Analyze the following resume and job description, then produce a tailored version.
+SEMANTIC TOOL MAPPING — if the JD requires a tool the candidate lacks but they have a proven equivalent, surface the equivalent prominently and note the overlap in bullets where relevant. Do NOT add tools the candidate has never used. Examples of valid mappings:
+- JD: Datadog or New Relic → candidate has Dynatrace, Prometheus, Grafana: use those, add a bullet that calls out full-stack observability
+- JD: AI coding tools (GitHub Copilot, Cursor, Devin) → candidate has Claude AI, Amazon Q, GitHub Copilot, Bedrock: surface these explicitly
+- JD: Puppet → candidate has Ansible, Terraform: use those, do not invent Puppet
+- JD: SLO/SLI/error budget language → weave into bullets where the candidate's work clearly involved reliability targets, MTTR, or uptime SLAs
+- JD: "Site Reliability Engineer" title → open the summary with "Site Reliability Engineer (SRE) with X years..." only if that accurately describes the candidate's work"""
 
-<original_resume>
+_SCHEMA = '{"contact":{"name":"","email":"","phone":"","location":"","linkedin":"","github":""},"summary":"","experience":[{"title":"","company":"","location":"","start_date":"","end_date":"","bullets":["..."]}],"education":[{"degree":"","institution":"","graduation_year":"","gpa":"","honors":""}],"skills":{"groups":[{"label":"","items":""}],"soft":[""]},"certifications":[{"name":"","url":""}],"projects":[{"name":"","description":"","technologies":[""]}]}'
+
+_RESUME_BLOCK = """Resume to tailor:
+
+<resume>
 {resume_text}
-</original_resume>
+</resume>
 
-<job_description>
+Return JSON matching exactly:
+{schema}"""
+
+_JOB_BLOCK = """Job description:
+
+<job>
 {job_description}
-</job_description>
+</job>
 
-Return a JSON object with EXACTLY this structure (omit sections that have no basis in the original resume — use empty arrays, not null):
-
-{{
-  "contact": {{
-    "name": "string",
-    "email": "string or empty string",
-    "phone": "string or empty string",
-    "location": "string or empty string",
-    "linkedin": "string or empty string",
-    "github": "string or empty string"
-  }},
-  "summary": "string — 3 to 4 sentences tailored to the role",
-  "experience": [
-    {{
-      "title": "string",
-      "company": "string",
-      "location": "string or empty string",
-      "start_date": "string",
-      "end_date": "string",
-      "bullets": ["string", "string"]
-    }}
-  ],
-  "education": [
-    {{
-      "degree": "string",
-      "institution": "string",
-      "graduation_year": "string",
-      "gpa": "string or empty string",
-      "honors": "string or empty string"
-    }}
-  ],
-  "skills": {{
-    "technical": ["string"],
-    "soft": ["string"]
-  }},
-  "certifications": ["string"],
-  "projects": [
-    {{
-      "name": "string",
-      "description": "string",
-      "technologies": ["string"]
-    }}
-  ]
-}}"""
+Mirror exact job title and keywords in summary and bullets. Include every matching skill the candidate genuinely has."""
 
 
 def _extract_json(raw: str) -> dict:
@@ -83,24 +60,29 @@ def _extract_json(raw: str) -> dict:
     return json.loads(text.strip())
 
 
-def tailor_resume(resume_text: str, job_description: str) -> dict:
-    user_prompt = USER_PROMPT_TEMPLATE.format(
-        resume_text=resume_text,
-        job_description=job_description,
-    )
+FAST_MODEL = "claude-haiku-4-5-20251001"
+QUALITY_MODEL = "claude-sonnet-4-6"
+
+
+def tailor_resume(resume_text: str, job_description: str, quality_mode: bool = False) -> dict:
+    model = QUALITY_MODEL if quality_mode else FAST_MODEL
+    resume_block = _RESUME_BLOCK.format(resume_text=resume_text, schema=_SCHEMA)
+    job_block = _JOB_BLOCK.format(job_description=job_description)
 
     try:
         response = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=4096,
+            model=model,
+            max_tokens=8192,
             system=[
-                {
-                    "type": "text",
-                    "text": SYSTEM_PROMPT,
-                    "cache_control": {"type": "ephemeral"},
-                }
+                {"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}
             ],
-            messages=[{"role": "user", "content": user_prompt}],
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": resume_block, "cache_control": {"type": "ephemeral"}},
+                    {"type": "text", "text": job_block},
+                ],
+            }],
         )
         raw = response.content[0].text
         return _extract_json(raw)
@@ -110,6 +92,8 @@ def tailor_resume(resume_text: str, job_description: str) -> dict:
     except anthropic.RateLimitError as e:
         raise HTTPException(429, detail="Too many requests. Please wait a moment and try again.") from e
     except anthropic.APIStatusError as e:
-        raise HTTPException(502, detail="AI service returned an error. Please try again.") from e
+        print(f"Anthropic API error {e.status_code}: {e.message}")
+        raise HTTPException(502, detail=f"AI service error ({e.status_code}). Please try again.") from e
     except (json.JSONDecodeError, ValueError) as e:
+        print(f"JSON parse error: {e}\nRaw response: {raw[:500] if 'raw' in dir() else 'N/A'}")
         raise HTTPException(500, detail="Failed to parse AI response. Please try again.") from e
