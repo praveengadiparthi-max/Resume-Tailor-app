@@ -27,8 +27,9 @@ override.tf.json
 .env.*.local
 .envrc
 
-# Default resume (personal file — do not commit)
+# Default resume and local data (personal files — do not commit)
 backend/assets/
+backend/data/
 
 # Python virtual environment
 backend/venv/
