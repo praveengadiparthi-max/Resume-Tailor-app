@@ -15,10 +15,13 @@ const INITIAL_STATE = {
   qualityMode: false,
   downloadToken: null,
   candidateName: null,
+  companyName: null,
   errorMessage: null,
   progress: 0,
   elapsedSeconds: null,
   modelUsed: null,
+  savedPath: null,
+  totalCount: null,
 }
 
 export default function App() {
@@ -68,7 +71,7 @@ export default function App() {
       }
       stopFakeProgress()
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
-      patch({ progress: 100, phase: 'ready', downloadToken: data.download_token, candidateName: data.candidate_name, elapsedSeconds: elapsed, modelUsed })
+      patch({ progress: 100, phase: 'ready', downloadToken: data.download_token, candidateName: data.candidate_name, companyName: data.company_name, elapsedSeconds: elapsed, modelUsed, savedPath: null, totalCount: data.total_count })
     } catch (err) {
       stopFakeProgress()
       patch({ phase: 'error', errorMessage: err.message, progress: 0 })
@@ -78,6 +81,9 @@ export default function App() {
   function handleReset() {
     stopFakeProgress()
     setState(INITIAL_STATE)
+    fetchDefaultResume().then((file) => {
+      if (file) patch({ file, inputMode: 'upload' })
+    })
   }
 
   useEffect(() => {
@@ -114,7 +120,17 @@ export default function App() {
         </div>
 
         {state.phase === 'ready' ? (
-          <DownloadSection token={state.downloadToken} candidateName={state.candidateName} onReset={handleReset} elapsedSeconds={state.elapsedSeconds} modelUsed={state.modelUsed} />
+          <DownloadSection
+            token={state.downloadToken}
+            candidateName={state.candidateName}
+            companyName={state.companyName}
+            onReset={handleReset}
+            elapsedSeconds={state.elapsedSeconds}
+            modelUsed={state.modelUsed}
+            savedPath={state.savedPath}
+            onSaved={(path) => patch({ savedPath: path })}
+            totalCount={state.totalCount}
+          />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Left column */}

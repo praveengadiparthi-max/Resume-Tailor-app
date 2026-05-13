@@ -11,7 +11,7 @@ from reportlab.platypus import (
     HRFlowable,
     KeepTogether,
 )
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
 
 
 NAVY = colors.HexColor("#1a3a5c")
@@ -57,15 +57,16 @@ def _styles(compact: bool = False):
         ),
         "body": ParagraphStyle(
             "body", fontName="Helvetica", fontSize=9.5, textColor=DARK,
-            leading=bl, spaceAfter=ba,
+            leading=bl, spaceAfter=ba, alignment=TA_JUSTIFY,
         ),
         "bullet": ParagraphStyle(
             "bullet", fontName="Helvetica", fontSize=9.5, textColor=DARK,
-            leading=bl, leftIndent=10, firstLineIndent=0, spaceAfter=bul_sa,
+            leading=bl, leftIndent=0, firstLineIndent=0, spaceAfter=bul_sa,
+            alignment=TA_LEFT,
         ),
         "skill_row": ParagraphStyle(
             "skill_row", fontName="Helvetica", fontSize=9.5, textColor=DARK,
-            leading=bl, spaceAfter=sr_sa,
+            leading=bl, spaceAfter=sr_sa, alignment=TA_LEFT,
         ),
         "_hr_sa": hr_sa,
         "_job_spacer": 3 if compact else 5,
@@ -138,12 +139,23 @@ def _build_pdf(data: dict, compact: bool = False) -> bytes:
         _section_block(story, "Work Experience", s)
         for job in data["experience"]:
             title = _esc(job.get("title", ""))
-            company = _esc(job.get("company", ""))
+            employer = _esc(job.get("employer", "") or job.get("company", ""))
+            client = _esc(job.get("client", ""))
             location = _esc(job.get("location", ""))
+            work_type = _esc(job.get("work_type", ""))
             start = _esc(job.get("start_date", ""))
             end = _esc(job.get("end_date", ""))
             date_range = f"{start} – {end}" if start else end
-            company_loc = f"{company}, {location}" if location else company
+
+            # Build meta line: Employer  ·  Client: X  ·  Work Type  ·  Location
+            meta_parts = [employer] if employer else []
+            if client:
+                meta_parts.append(f"Client: {client}")
+            if work_type:
+                meta_parts.append(work_type)
+            if location:
+                meta_parts.append(location)
+            company_loc = "  ·  ".join(meta_parts)
             header_block = KeepTogether([
                 Paragraph(
                     f'<b>{title}</b><font color="#555555" size="8.5">    {date_range}</font>',

@@ -59,6 +59,15 @@ export function getDownloadUrl(token) {
   return `/api/download/${token}`
 }
 
+export async function saveLocal(token) {
+  try {
+    const response = await api.post(`/save-local/${token}`)
+    return response.data.saved_to
+  } catch (err) {
+    throw new Error(friendlyError(err))
+  }
+}
+
 export async function fetchDefaultResume() {
   const resp = await fetch('/api/default-resume')
   if (!resp.ok) return null

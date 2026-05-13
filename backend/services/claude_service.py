@@ -16,11 +16,13 @@ SYSTEM_PROMPT = """You are an ATS resume expert. Tailor resumes to pass automate
 RULES:
 - Never fabricate experience, skills, dates, employer names, job titles, degrees, or GPA.
 - Rephrase bullets and weave in job description keywords where they accurately reflect the candidate's experience.
-- Use strong action verbs: built, led, automated, deployed, optimized, reduced, increased, implemented.
+- Use strong action verbs: built, led, automated, deployed, optimized, reduced, increased, implemented, architected, engineered, designed, delivered, streamlined, accelerated, established, drove, spearheaded, orchestrated, configured, integrated, migrated, scaled, hardened, standardized.
+- Never start two bullets in the same job with the same verb. Vary the opening word across every bullet within a role.
 - Quantify where the original implies measurable results (e.g., "improved X" → "improved X by ~30%").
 - Summary: 3-4 sentences mirroring exact keywords from the job description.
 - Skills: only include skills and tools that are relevant to or mentioned in the job description. Drop entire skill groups or individual items that have no connection to the JD. Keep categories from the original but trim aggressively — a focused skills section scores better than an exhaustive one.
 - Preserve ALL certification URLs from [HYPERLINKS IN DOCUMENT] if present.
+- For each experience entry extract: employer (the hiring/staffing firm), client (the end-client company if a contract role, else leave empty), work_type (e.g. "Contract | Remote", "Contract | Hybrid", "Full-Time | Onsite"), location (city, state, country only). If the resume shows a pattern like "Employer → Client: Company" or "company (Client: X)", split them into employer and client fields accordingly.
 - Output ONLY valid JSON, no prose, no markdown fences.
 
 SEMANTIC TOOL MAPPING — if the JD requires a tool the candidate lacks but they have a proven equivalent, surface the equivalent prominently and note the overlap in bullets where relevant. Do NOT add tools the candidate has never used. Examples of valid mappings:
@@ -30,7 +32,7 @@ SEMANTIC TOOL MAPPING — if the JD requires a tool the candidate lacks but they
 - JD: SLO/SLI/error budget language → weave into bullets where the candidate's work clearly involved reliability targets, MTTR, or uptime SLAs
 - JD: "Site Reliability Engineer" title → open the summary with "Site Reliability Engineer (SRE) with X years..." only if that accurately describes the candidate's work"""
 
-_SCHEMA = '{"contact":{"name":"","email":"","phone":"","location":"","linkedin":"","github":""},"summary":"","experience":[{"title":"","company":"","location":"","start_date":"","end_date":"","bullets":["..."]}],"education":[{"degree":"","institution":"","graduation_year":"","gpa":"","honors":""}],"skills":{"groups":[{"label":"","items":""}],"soft":[""]},"certifications":[{"name":"","url":""}],"projects":[{"name":"","description":"","technologies":[""]}]}'
+_SCHEMA = '{"target_company":"","contact":{"name":"","email":"","phone":"","location":"","linkedin":"","github":""},"summary":"","experience":[{"title":"","employer":"","client":"","location":"","work_type":"","start_date":"","end_date":"","bullets":["..."]}],"education":[{"degree":"","institution":"","graduation_year":"","gpa":"","honors":""}],"skills":{"groups":[{"label":"","items":""}],"soft":[""]},"certifications":[{"name":"","url":""}],"projects":[{"name":"","description":"","technologies":[""]}]}'
 
 _RESUME_BLOCK = """Resume to tailor:
 

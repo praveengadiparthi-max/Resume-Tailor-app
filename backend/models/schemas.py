@@ -11,3 +11,5 @@ class TailorResponse(BaseModel):
     message: str
     download_token: str
     candidate_name: str
+    company_name: str = ""
+    total_count: int = 0
